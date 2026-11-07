@@ -38,6 +38,8 @@ func Parse(raw string) (Mutation, bool) {
 	if !tool.Validate(ManageSchema, raw) || json.Unmarshal([]byte(raw), &m) != nil || HasSecret(m.Content) {
 		return m, false
 	}
+	m.MemoryRef = tool.ObjectRef("memory", m.MemoryRef)
+	m.Supersedes = tool.ObjectRef("memory", m.Supersedes)
 	validRef := func(v string) bool {
 		return strings.HasPrefix(v, "memory:") && len(v) > 7 && !strings.ContainsAny(v, " /\\\n\r")
 	}

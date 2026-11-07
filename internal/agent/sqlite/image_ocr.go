@@ -48,6 +48,7 @@ func (t *tools) executeImageOCR(ctx context.Context, inv tool.Invocation) (tool.
 	if json.Unmarshal([]byte(args), &request) != nil {
 		return tool.Failure("INVALID_ARGUMENT"), nil
 	}
+	request.Ref = tool.ObjectRef("artifact", request.Ref)
 	if t.runs.imageOCR == nil {
 		return tool.Failure("PROVIDER_UNAVAILABLE"), nil
 	}

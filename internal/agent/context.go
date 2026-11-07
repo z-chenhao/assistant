@@ -103,8 +103,8 @@ func InitialContext(o ContextOptions) []AgentMessage {
 			text = "Task anchor: " + o.Title + "\n" + text
 		}
 		if len(o.ArtifactRefs) > 0 {
-			raw, _ := json.Marshal(o.ArtifactRefs)
-			text += "\nExplicit artifact references: " + string(raw)
+			raw, _ := json.Marshal(tool.ObjectIDs(o.ArtifactRefs))
+			text += "\nExplicit artifact IDs: " + string(raw)
 		}
 		m := TextMessage("user", text)
 		m.Source = &llm.ContextSource{Kind: "task", Protected: true}

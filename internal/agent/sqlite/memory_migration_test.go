@@ -41,7 +41,7 @@ func TestV18AcceptedContextReplaysWithoutRetrospectiveCompaction(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	messages, e := agent.ProviderMessages(run.Checkpoint.Messages, false)
+	messages, e := agent.ProviderMessages(run.Checkpoint.Messages, false, false)
 	if e != nil {
 		t.Fatal(e)
 	}

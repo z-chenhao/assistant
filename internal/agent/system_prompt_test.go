@@ -29,7 +29,7 @@ func TestSkillsUseSearchWithoutPromptCatalog(t *testing.T) {
 		}
 	}
 	for _, role := range []string{"main", "root", "child"} {
-		wire, err := ProviderMessages(InitialContext(ContextOptions{Position: role, Tools: specs, Task: "Review the request"}), false)
+		wire, err := ProviderMessages(InitialContext(ContextOptions{Position: role, Tools: specs, Task: "Review the request"}), false, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -102,7 +102,7 @@ func TestAgentStartsWithOneFrozenSystemMessage(t *testing.T) {
 			if _, ok := FrozenSystemSections(messages); !ok {
 				t.Fatal("frozen sections are inconsistent")
 			}
-			wire, err := ProviderMessages(messages, false)
+			wire, err := ProviderMessages(messages, false, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -117,7 +117,7 @@ func TestAgentStartsWithOneFrozenSystemMessage(t *testing.T) {
 }
 
 func TestSplitSystemMessagesAreRejected(t *testing.T) {
-	if _, err := ProviderMessages([]AgentMessage{TextMessage("system", "role"), TextMessage("system", "safety")}, false); err != llm.ModelIncompatible {
+	if _, err := ProviderMessages([]AgentMessage{TextMessage("system", "role"), TextMessage("system", "safety")}, false, false); err != llm.ModelIncompatible {
 		t.Fatal("split prompts accepted", err)
 	}
 }

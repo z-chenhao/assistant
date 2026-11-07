@@ -752,11 +752,11 @@ func TestArtifactManageSearchExecutionAndReplay(t *testing.T) {
 	}
 	batch := []llm.ToolCall{
 		{ID: "search", Name: artifacttools.Search, Arguments: `{"query":"Évidence.md","limit":1}`},
-		{ID: "read", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"read","artifactRef":%q,"offset":0,"limit":8}`, ref)},
-		{ID: "describe", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"describe","artifactRef":%q}`, ref)},
-		{ID: "foreign", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"read","artifactRef":%q}`, foreign)},
-		{ID: "publish", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"publish","artifactRefs":[%q]}`, ref)},
-		{ID: "bad", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"read","artifactRef":%q,"artifactRefs":[%q]}`, ref, ref)},
+		{ID: "read", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"read","artifactRef":%q,"offset":0,"limit":8}`, tool.ObjectID(ref))},
+		{ID: "describe", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"describe","artifactRef":%q}`, tool.ObjectID(ref))},
+		{ID: "foreign", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"read","artifactRef":%q}`, tool.ObjectID(foreign))},
+		{ID: "publish", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"publish","artifactRefs":[%q]}`, tool.ObjectID(ref))},
+		{ID: "bad", Name: artifacttools.Manage, Arguments: fmt.Sprintf(`{"operation":"read","artifactRef":%q,"artifactRefs":[%q]}`, ref, tool.ObjectID(ref))},
 		{ID: "lower", Name: artifacttools.Search, Arguments: `{"query":"évidence.md","limit":1}`},
 		{ID: "upper", Name: artifacttools.Search, Arguments: `{"query":"ÉVIDENCE.MD","limit":1}`},
 		{ID: "suffix", Name: artifacttools.Search, Arguments: `{"query":"vidence.md","limit":1}`},

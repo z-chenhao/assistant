@@ -112,7 +112,11 @@ def run(binary, scenario_jobs=1):
             check(value, children=1)
             inv = next(i for i in value["tools"] if i["tool_name"] == "builtin__agent_run")
             result = json.loads(json.loads(inv["result_json"])["text"])
-            require(len(result["artifactRefs"]) == 1 and result["artifactRefs"] == json.loads(inv["arguments_json"])["artifactRefs"], "explicit Artifact input/result lost")
+            inputs = json.loads(inv["arguments_json"])["artifactRefs"]
+            require(len(result["artifactRefs"]) == 1 and [ref.removeprefix("artifact:") for ref in result["artifactRefs"]] == inputs, "explicit Artifact input/result lost")
+            parent_requests = [json.loads(g["request_json"]) for g in value["generations"] if g["run_id"] == inv["run_id"]]
+            returned = [json.loads(m["text"]) for request in parent_requests for m in request["messages"] if m.get("tool_call_id") == inv["provider_call_id"] and m["role"] == "tool" and "artifactRefs" in json.loads(m["text"])]
+            require(returned and all(value["artifactRefs"] == inputs for value in returned), "Child result did not present ordinary Artifact IDs")
             require(len(value["artifacts"]) == 1 and len(value["publications"]) == 2, "child Artifact duplicated or not returned to Root")
             return value
 

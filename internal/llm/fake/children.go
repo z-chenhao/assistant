@@ -24,6 +24,7 @@ func childrenReply(req llm.GenerationRequest) (llm.GenerationResult, error) {
 		if m.Role == "user" && input == "" {
 			input = m.Text
 			input, _, _ = strings.Cut(input, "\nExplicit artifact references: ")
+			input, _, _ = strings.Cut(input, "\nExplicit artifact IDs: ")
 		}
 		for _, c := range m.ToolCalls {
 			prior = c

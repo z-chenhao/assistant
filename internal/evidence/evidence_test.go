@@ -37,6 +37,14 @@ func TestGitHubEvidenceReferenceIsCanonicalAndOwnerOnly(t *testing.T) {
 }
 
 func TestEvidenceRequestAndUTF8Windows(t *testing.T) {
+	if q, err := Parse(`{"kind":"conversation","ref":"message-id","limit":32}`); err != nil || q.Ref != "conversation:message-id" {
+		t.Fatal("ordinary ID did not resolve in its explicit kind", q, err)
+	}
+	for _, raw := range []string{`{"ref":"message-id"}`, `{"kind":"artifact","ref":"conversation:message-id"}`, `{"kind":"memory","ref":"secret"}`, `{"kind":"task","ref":"current"}`} {
+		if _, err := Parse(raw); err == nil {
+			t.Fatal("ambiguous or unauthorized ID accepted", raw)
+		}
+	}
 	for _, raw := range []string{`{}`, `{"ref":"current","ref":"task:x"}`, `{"ref":"current","limit":null}`, `{"ref":"memory:x"}`, `{"ref":"task:a/b"}`, `{"ref":"current","scope":"all"}`, `{"ref":"current","limit":3}`, `{"ref":"current","offset":-1}`, `{"ref":"current"} {}`} {
 		if _, err := Parse(raw); err == nil {
 			t.Fatal("invalid evidence request accepted", raw)

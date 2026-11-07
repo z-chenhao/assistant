@@ -20,7 +20,7 @@ SOFTWARE = {
 }
 SYSTEM = {
     'main-tasks': ('main', 'tasks', 'children'),
-    'tools-provider': ('tools', 'code-recovery', 'local-provider', 'account'),
+    'tools-provider': ('tools', 'artifacts', 'code-recovery', 'local-provider', 'account'),
     'startup-ui': ('startup', 'intelligent-ui', 'ui-interactions'),
 }
 MEMORY_GATES = ('memory-maintenance', 'recall')

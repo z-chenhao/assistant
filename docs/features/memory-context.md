@@ -15,7 +15,7 @@
 
 每轮或按需检索可访问的 Memory 和原始 Conversation。
 
-新 Main 的自动召回结合最近一轮问答理解“展示结论”等接续请求，过滤当前工作上下文已有的原文与重复命中；历史证据放在当前请求之前，并明确不能替代当前话题。同一逻辑输入的工具续轮、摘要、重试和重启复用首次召回，新用户输入或 Task 指令才重新检索；每次模型调用仍检查窗口并冻结实际请求。旧 Run 沿用已冻结策略。
+新 Main 的自动召回结合最近一轮问答理解“展示结论”等接续请求，过滤当前工作上下文已有的原文与重复命中；history 提供当前工作集，Conversation recall 补充工作集之外的相关证据。召回按原始时间排序，作为当前 user message 的 `<recall_memory>` 区块附在用户正文之后，不创建额外消息，并明确不能替代当前话题。同一逻辑输入的工具续轮、摘要、重试和重启复用首次召回，新用户输入或 Task 指令才重新检索；每次模型调用仍检查窗口并冻结实际请求。旧 Run 沿用已冻结策略。
 
 长对话保留目标、决策、约束和待办，省略内容可追溯。
 
@@ -41,7 +41,7 @@
 
 **需求**：每轮或按需检索可访问的 Memory 和原始 Conversation；从当前消息或任务沿明确引用查找关联工作、产物与原始证据，摘要不足时按需续读。
 
-**当前实现**：默认本地文本相关性检索，自定义 embedding 下融合全文与向量。自动召回按真实输入查询，排除上下文已有原文及其派生记忆，跨来源去重，结果按轮冻结并带来源。Main 的 `builtin__evidence_read` 和本机 `evidence read` 支持确切 Conversation、Task 和 Artifact 引用及有界续读。本机所有者还可精读当前 `memory:` 记录和可见 Conversation/Task 来源。精确读取无需 embedding。结构化摘要的原文仍通过已有私有 Artifact 授权读取。
+**当前实现**：默认本地文本相关性检索，自定义 embedding 下融合全文与向量。自动召回按真实输入查询，在候选截取前排除工作集已有原文及其派生记忆，跨来源去重；已经压缩出工作集的旧消息可重新召回，尚未消费的输入继续排除。结果按逻辑输入冻结，正文带原始时间。Main 的 `builtin__evidence_read` 和本机 `evidence read` 支持确切 Conversation、Task 和 Artifact 引用及有界续读。本机所有者还可精读当前 `memory:` 记录和可见 Conversation/Task 来源。精确读取无需 embedding。结构化摘要的原文仍通过已有私有 Artifact 授权读取。模型侧 `source_ref` 为普通 ID，类型由 `source_type` 明示；内部来源键保留用于授权、去重与审计。
 
 **边界与剩余工作**：导航基于已保存的任务请求、交付、附件、Memory 来源和当前 GitHub 接续记录。每跳校验作用域、Forget 和对象可见性。Worker/Child 保持显式子任务边界。Main 的 Memory 原文解密需要独立的结果隐私设计。Memory 替代谱系、Main 的 GitHub 导航和其他外部来源尚待接通。本地文本召回无需 embedding，跨语言近义检索需自定义 embedding。大规模 ANN 性能和真实模型导航质量另行验证。
 
@@ -67,7 +67,7 @@
 
 ### 沿明确引用读取证据
 
-新的 Main 可调用只读工具 `builtin__evidence_read`，输入 `{ "ref": "current" }` 读取本轮已消费的最近用户输入。已有召回或导航返回的 `conversation:...`、`task:...` 和 `artifact:...` 可直接作为 `ref`；用户和模型都不能指定 Agent、Run 或权限。工具返回窄投影，不暴露内部持久化模型。
+新的 Main 可调用只读工具 `builtin__evidence_read`，输入 `{ "ref": "current" }` 读取本轮已消费的最近用户输入。模型使用普通对象 ID：例如 `{ "kind": "conversation", "ref": "message-id" }` 或 `{ "kind": "artifact", "ref": "file-id" }`。搜索结果的 `source_type` 和导航链接的 `kind` 标识对象类型；`ref` 不含类型前缀。用户和模型都不能指定 Agent、Run 或权限。工具返回窄投影，不暴露内部持久化模型。新 Run 的附件、Task、Memory、Automation、Code Mode 和摘要同样只呈现普通对象 ID；内部键、授权及历史冻结记录不变。
 
 本机等价入口读取 stdin JSON；它可在模型未配置或执行依赖故障时使用。CLI 的 `current` 指最新已接受的本机用户输入，可能早于后台处理完成。
 

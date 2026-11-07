@@ -91,7 +91,7 @@ func (r *Runs) ReadEvidence(ctx context.Context, q evidence.Request) (evidence.P
 	if err != nil {
 		return evidence.Page{}, evidence.ErrInvalid
 	}
-	if _, err = evidence.Parse(raw); err != nil {
+	if q, err = evidence.Parse(raw); err != nil {
 		return evidence.Page{}, err
 	}
 	page, err := r.readEvidence(ctx, q, nil)
@@ -148,6 +148,9 @@ func (t *tools) readLinkedEvidence(ctx context.Context, inv tool.Invocation) (to
 	}
 	if err != nil {
 		return tool.Result{}, evidenceReadError(err)
+	}
+	for i := range page.Links {
+		page.Links[i].Kind, _, _ = strings.Cut(page.Links[i].Ref, ":")
 	}
 	raw, err := encoded(page)
 	return tool.Result{Text: raw}, err

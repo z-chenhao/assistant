@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/z-chenhao/assistant/internal/config"
@@ -27,6 +28,16 @@ func OpenEvidenceControl(ctx context.Context, cfg config.Config, fixture, secret
 }
 
 func (a *App) ReadEvidence(ctx context.Context, q evidence.Request) (evidence.Page, error) {
+	if q.Kind != "" {
+		raw, err := json.Marshal(q)
+		if err != nil {
+			return evidence.Page{}, evidence.ErrInvalid
+		}
+		q, err = evidence.ParseOwner(string(raw))
+		if err != nil {
+			return evidence.Page{}, err
+		}
+	}
 	if strings.HasPrefix(q.Ref, "memory:") {
 		if a.evidenceVault == nil {
 			return evidence.Page{}, evidence.ErrInvalid

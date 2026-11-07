@@ -95,7 +95,25 @@ func (l *agentLoop) drainTools(r Run) error {
 }
 
 func operationRef(step int64, index int) string {
-	return fmt.Sprintf("operation:%d:%d", step, index)
+	return fmt.Sprintf("%d-%d", step, index)
+}
+
+func deferredOperationRef(messages []AgentMessage, step int64, index int, callID string) string {
+	ref := operationRef(step, index)
+	legacy := fmt.Sprintf("operation:%d:%d", step, index)
+	for _, prior := range messages {
+		if prior.Type != "tool_result" || prior.ToolCallID != callID {
+			continue
+		}
+		var receipt struct {
+			Status string `json:"status"`
+			Ref    string `json:"operation_ref"`
+		}
+		if json.Unmarshal([]byte(messageText(prior)), &receipt) == nil && receipt.Status == "pending" && (receipt.Ref == ref || receipt.Ref == legacy) {
+			return receipt.Ref
+		}
+	}
+	return ref
 }
 
 // Fast calls retain ordinary native ToolResults. Only a new input (or an
@@ -222,12 +240,13 @@ func (l *agentLoop) collectTools(r Run) (bool, error) {
 			if err := applyToolLoads(&cp, r.Tools, batch.Calls[i].Name, result); err != nil {
 				return false, err
 			}
-			ref := operationRef(batch.Step, i)
+			// A pre-upgrade pending receipt keeps its exact correlation identity.
+			ref := deferredOperationRef(cp.Messages, batch.Step, i, batch.Calls[i].ID)
 			m := RuntimeContext("tool_results", "", result.Error != nil && result.Error.Code == "UNKNOWN_SIDE_EFFECT", struct {
 				OperationRef string      `json:"operation_ref"`
 				Tool         string      `json:"tool"`
 				Result       tool.Result `json:"result"`
-			}{ref, batch.Calls[i].Name, result})
+			}{ref, batch.Calls[i].Name, result.ForModel()})
 			for _, imageRef := range result.ImageRefs {
 				m.Content = append(m.Content, conversation.ContentPart{Type: "image", ArtifactRef: imageRef})
 			}

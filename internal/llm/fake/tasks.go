@@ -7,18 +7,28 @@ import (
 
 	"github.com/z-chenhao/assistant/internal/llm"
 	"github.com/z-chenhao/assistant/internal/task"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 // A follow-up contains historical user text. Only input after its runtime notice
 // is fresh steering; accepted notices remain in context on later model steps.
 func hasAppendedUser(messages []llm.Message) bool {
 	user, notice := -1, -1
+	summarizedInput := ""
 	for i, m := range messages {
-		if m.Origin == "runtime" && strings.HasPrefix(m.Text, "Runtime task update") {
+		if summary := contextSummary(m); summary.TaskUpdate {
+			notice, summarizedInput = i, summary.InputRef
+		} else if m.Origin == "runtime" && strings.HasPrefix(m.Text, "Runtime task update") {
 			notice = i
+			summarizedInput = ""
 		} else if m.Role == "user" && m.Origin == "" {
 			user = i
 		}
+	}
+	// Compaction may place a retained input after its summary. Identify that
+	// input by its source identity rather than mistaking its position for time.
+	if summarizedInput != "" && user >= 0 && messages[user].Source != nil {
+		return tool.ObjectID(messages[user].Source.Ref) != summarizedInput
 	}
 	return notice >= 0 && user > notice
 }

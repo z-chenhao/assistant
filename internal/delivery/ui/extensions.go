@@ -90,7 +90,7 @@ func validExtension(c Component) bool {
 			if strings.TrimSpace(item.Title) == "" {
 				return false
 			}
-			if item.ImageRef != "" && (!strings.HasPrefix(item.ImageRef, "artifact:") || strings.ContainsAny(item.ImageRef, "/\\ \r\n")) {
+			if item.ImageRef != "" && (strings.Contains(item.ImageRef, ":") && !strings.HasPrefix(item.ImageRef, "artifact:") || strings.ContainsAny(item.ImageRef, "/\\ \r\n\x00")) {
 				return false
 			}
 			if item.URL != "" {
