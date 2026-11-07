@@ -46,7 +46,14 @@ function ModelPicker({initial,composer}:{initial:Models;composer:HTMLFormElement
   setOpen(false);setSaving(true);setError('');composer.dataset.modelSelecting='true';
   const submit=composer.querySelector<HTMLButtonElement>('button[type=submit]');if(submit)submit.disabled=true;
   try{const response=await fetch('/model/choose',{method:'POST',headers:{Accept:'application/json'},signal:AbortSignal.timeout(30000),body:new URLSearchParams({consent:'yes',choice:value,config_version:String(data.config_version)})});if(!response.ok)throw Error();const confirmed=models.parse(await response.json());setData(previous=>retainAccountChoices(previous,confirmed))}
-  catch{const latest=await refresh();if(latest?.current!==value)setError('Model selection failed. Try again.')}
+  catch{
+   const latest=await refresh();
+   // Activation increments a saved profile's version, so readback compares its
+   // logical profile identity as well as exact account-model keys.
+   const profile=value.startsWith('profile:')?value.slice(0,value.lastIndexOf(':')):undefined;
+   const current=latest?.current;
+   if(current!==value&&!(profile&&current?.slice(0,current.lastIndexOf(':'))===profile))setError('Model selection failed. Try again.');
+  }
   finally{delete composer.dataset.modelSelecting;setSaving(false);if(submit)submit.disabled=!!composer.dataset.submitting||document.querySelector<HTMLElement>('[data-can-send]')?.dataset.canSend==='false'}
  }
  const options=data.choices.map(choice=>({value:choice.key,label:choice.label,disabled:!!choice.disabled,lang:''}));

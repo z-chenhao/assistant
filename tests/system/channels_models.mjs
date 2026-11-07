@@ -131,7 +131,8 @@ export async function composerModelLoading(page,context,url,evidence){
  await page.getByRole('option',{name:'fixture-model-11',exact:true}).click();await picker.filter({hasText:'fixture-model-11'}).waitFor();
  mode='ready';dropSwitch=true;await picker.click();await page.getByRole('option',{name:'fixture-model-10',exact:true}).click();await picker.filter({hasText:'fixture-model-10'}).waitFor();await assertDraft();
  if(await page.getByText('Model selection failed. Try again.',{exact:true}).count())throw Error('unknown applied selection failed readback');
- await picker.click();await page.getByRole('option',{name:'API connection',exact:true}).click();await picker.filter({hasText:'API connection'}).waitFor();
+ dropSwitch=true;await picker.click();await page.getByRole('option',{name:'API connection',exact:true}).click();await picker.filter({hasText:'API connection'}).waitFor();
+ if(await page.getByText('Model selection failed. Try again.',{exact:true}).count())throw Error('canonical profile selection failed readback after a lost response');
  const changedProfile=choices.find(choice=>choice.key.startsWith('profile:'));changedProfile.key='profile:api-connection:'+ ++version;current=changedProfile.key;
  mode='partial';await picker.click();await page.getByText('Some account models are unavailable. Try again.',{exact:true}).waitFor();await page.getByRole('option',{name:'API connection',exact:true}).waitFor();
  if(await page.getByRole('option').count()!==choices.length)throw Error('new profile version duplicated or removed cached choices');
