@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import {selectValue,selectParts} from './channels_controls.mjs';
 import {writeFile} from 'node:fs/promises';
 
@@ -88,10 +89,7 @@ export async function pageTransitions(page,context,url,evidence){
  const heading=await page.locator('.settings-page h1').boundingBox();
  for(const path of ['/settings/notifications','/settings/models','/settings/apps','/settings/capabilities']){
   await page.goto(url+path);const next=await page.locator('.settings-page h1').boundingBox();
-  // Apps needs a wider catalogue; it keeps the shared title height/top while
-  // its horizontal position follows its own content padding.
-  const expectedX=path==='/settings/apps'?await page.locator('.apps-page').evaluate(node=>node.getBoundingClientRect().x+parseFloat(getComputedStyle(node).paddingLeft)):heading.x;
-  if(!next||Math.abs(next.x-expectedX)>1||Math.abs(next.y-heading.y)>1||Math.abs(next.height-heading.height)>1)throw Error('Settings title left its content bounds or shared vertical alignment: '+path);
+  if(!next||Math.abs(next.x-heading.x)>1||Math.abs(next.y-heading.y)>1||Math.abs(next.height-heading.height)>1)throw Error('Settings title left its shared alignment: '+path);
  }
  for(const language of ['en','zh-CN']){
   await context.request.post(url+'/settings/language',{form:{language}});
@@ -547,4 +545,76 @@ export async function settingsConsistency(page,context,url,evidence){
   }
  }
  await writeFile(evidence+'/settings-consistency.json',JSON.stringify({autosave:true,cas:true,lostAcknowledgement:true,nativeFallback:true,composableFilters:true,measurements},null,2));
+}
+
+// Exercise real server pages and shared controls together: a page-local exception
+// must fail even when each page is individually within the viewport.
+export async function settingsLayout(page,context,browser,url,evidence){
+ const measurements=[];
+ const tabs=['preferences','notifications','models','apps','capabilities'];
+ const close=(actual,expected,label)=>assert(Math.abs(actual-expected)<=1,`${label}: ${actual} != ${expected}`);
+ const geometry=async()=>page.evaluate(()=>{
+  const rect=n=>{const r=n.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right}};
+  const frame=document.querySelector('.settings-page'),box=rect(frame),style=getComputedStyle(frame);
+  return {frame:box,left:box.x+parseFloat(style.paddingLeft),right:box.right-parseFloat(style.paddingRight),title:rect(frame.querySelector('h1')),
+   overflow:document.documentElement.scrollWidth>innerWidth,
+   controls:[...frame.querySelectorAll('.preference-controls .control-select,.setting-row>.control-select,.notification-preference .setting-controls .control-select')].map(rect)};
+ });
+ const visit=async path=>{
+  await page.goto(url+'/settings/'+path);
+  await page.evaluate(()=>document.fonts.ready);
+  if(path==='preferences')await page.locator('#interface-theme-picker').waitFor();
+  if(path==='notifications')await page.locator('#notification-target-picker').waitFor();
+  if(path==='capabilities/memory')await page.locator('#capability-mode-picker').waitFor();
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  const result=await geometry();assert(!result.overflow,`Settings overflow: ${path} at ${page.viewportSize().width}`);return result;
+ };
+ for(const language of ['en','zh-CN']){
+  await context.request.post(url+'/settings/language',{form:{language}});
+  for(const theme of ['light','dark']){
+   await page.evaluate(value=>localStorage.setItem('steward-theme',value),theme);
+   for(const width of [2048,1400,1024,761,760,390,320]){
+    await page.setViewportSize({width,height:980});let reference,value;
+    for(const tab of [...tabs,'capabilities/memory']){
+     const result=await visit(tab),label=`${language}/${theme}/${width}/${tab}`;
+     if(!reference)reference=result;
+     close(result.left,reference.left,label+' content left');close(result.right,reference.right,label+' content right');
+     close(result.frame.width,reference.frame.width,label+' frame width');close(result.title.x,reference.title.x,label+' title left');
+     // Details have a Back link above their heading, within the same frame.
+     if(tabs.includes(tab))close(result.title.y,reference.title.y,label+' title top');
+     for(const control of result.controls){
+      if(!value)value=control;
+      close(control.width,value.width,label+' Select width');close(control.height,value.height,label+' Select height');close(control.right,result.right,label+' Select trailing edge');
+      if(width<=760)assert(control.height>=44,label+' touch height');
+     }
+     measurements.push({language,theme,width,tab,...result});
+     if(language==='en'&&[2048,390].includes(width))await page.screenshot({path:`${evidence}/settings-${tab.replaceAll('/','-')}-${theme}-${width}.png`});
+    }
+    assert(reference.controls.length===2,'Language or Appearance selector missing');
+   }
+  }
+ }
+ // Collapsing the primary rail changes available space equally for all tabs.
+ await page.setViewportSize({width:1400,height:980});await page.evaluate(()=>localStorage.setItem('steward-sidebar','collapsed'));
+ let collapsed;
+ for(const tab of tabs){const result=await visit(tab);if(!collapsed)collapsed=result;close(result.left,collapsed.left,tab+' collapsed left');close(result.right,collapsed.right,tab+' collapsed right')}
+ await page.evaluate(()=>{localStorage.setItem('steward-sidebar','open');localStorage.setItem('steward-theme','light')});
+ await context.request.post(url+'/settings/language',{form:{language:'en'}});
+ const native=await browser.newContext({javaScriptEnabled:false,viewport:{width:1400,height:980}});
+ try{
+  await native.addCookies(await context.cookies());const plain=await native.newPage();
+  for(const width of [1400,761,390,320]){
+   await plain.setViewportSize({width,height:980});let value;
+   for(const tab of ['preferences','notifications','capabilities/memory']){
+    await plain.goto(url+'/settings/'+tab);await plain.evaluate(()=>document.fonts.ready);
+    const result=await plain.locator('#interface-language,#notification-target,#capability-mode').evaluate(n=>{const r=n.getBoundingClientRect();return {width:r.width,right:r.right,height:r.height,overflow:document.documentElement.scrollWidth>innerWidth}});
+    const enhanced=measurements.find(row=>row.language==='en'&&row.theme==='light'&&row.width===width&&row.tab==='preferences').controls[0];
+    close(result.width,enhanced.width,tab+' native/enhanced width');
+    if(!value)value=result;close(result.width,value.width,tab+' native width');close(result.right,value.right,tab+' native right');assert(!result.overflow,tab+' native overflow');
+    if(tab==='preferences')await plain.locator('.preference-save').waitFor({state:'visible'});
+   }
+  }
+ }finally{await native.close()}
+ await writeFile(evidence+'/settings-layout.json',JSON.stringify(measurements,null,2));
+ await page.goto(url+'/settings/apps');await page.locator('[data-apps-ready]').waitFor();
 }

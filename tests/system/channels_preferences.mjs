@@ -57,7 +57,7 @@ export async function preferences(page,context,browser,url,evidence){
     unwantedCopy:/选择后自动保存并刷新页面|Saves automatically and reloads this page/.test(document.querySelector('.settings-page').textContent)};
   });
   if(result.scrollWidth>result.viewport||result.pageTitles!==1||!result.valueFits||result.unwantedCopy)throw Error('layout/copy: '+JSON.stringify(result));
-  if(Math.max(...result.bounds.map(r=>r.center))-Math.min(...result.bounds.map(r=>r.center))>1)throw Error('default preference row wrapped');
+  if(Math.max(...result.bounds.map(r=>r.center))-Math.min(...result.bounds.map(r=>r.center))>1)throw Error('default preference row wrapped: '+JSON.stringify(result));
   for(let i=1;i<result.bounds.length;i++)if(result.bounds[i].x<result.bounds[i-1].right-1)throw Error('controls overlap');
   await check(p.locator('.preference-save').isHidden(),'Save visible in enhanced UI');
   return result;
@@ -80,11 +80,14 @@ export async function preferences(page,context,browser,url,evidence){
    const geometry=await layout(page);
    if(width===320){
     // Exercise the shrink boundary independently of platform font metrics:
-    // enough space for the 112px minimum, less than the 120px desktop cap.
+    // below the shared desktop width. A value takes at most 48% of a row;
+    // leave the actual label the remaining 52%, including fractional pixels.
+    // Keep at least the content space available just before mobile navigation.
     const row=page.locator('.preference-row').first();
     await row.evaluate(node=>{
      const style=getComputedStyle(node),name=node.querySelector('.preference-name');
-     node.style.inlineSize=`${name.getBoundingClientRect().width+parseFloat(style.columnGap)+116+parseFloat(style.paddingLeft)+parseFloat(style.paddingRight)}px`;
+     const labelWidth=name.getBoundingClientRect().width+parseFloat(style.columnGap);
+     node.style.inlineSize=`${Math.max(240,Math.ceil((labelWidth+2)/.52))+parseFloat(style.paddingLeft)+parseFloat(style.paddingRight)}px`;
     });
     await layout(page);
     await row.evaluate(node=>node.style.removeProperty('inline-size'));

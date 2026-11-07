@@ -27,7 +27,7 @@ func TestAppsBrowserConnectionLifecycle(t *testing.T) {
 	if os.Getenv("STEWARD_TEST_APP_BROWSER") != "1" {
 		t.Skip("run by make test-browser")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 70*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	store, err := sqlite.Open(ctx, t.TempDir())
 	if err != nil {
@@ -37,6 +37,7 @@ func TestAppsBrowserConnectionLifecycle(t *testing.T) {
 	s := languageServer()
 	s.Core.(*updatesCore).Core = &notificationCore{preference: interaction.Preference{Channel: "auto"}}
 	s.Models = settingsModels{}
+	s.Capabilities = settingsLayoutCapabilities{}
 	s.Tasks = workspaceReader{}
 	s.Schedules = &scheduleServiceFixture{}
 	var mu sync.Mutex
@@ -119,4 +120,21 @@ func TestAppsBrowserConnectionLifecycle(t *testing.T) {
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("browser flow: %v\n%s", err, output)
 	}
+}
+
+// Read-only domain peer; rendering and Select enhancement use the real server.
+type settingsLayoutCapabilities struct{}
+
+func (settingsLayoutCapabilities) List(context.Context) ([]Capability, error) {
+	return []Capability{{ID: "memory", Title: "Memory", State: "Enabled", Automatic: true}}, nil
+}
+func (settingsLayoutCapabilities) Detail(ctx context.Context, _ string) (Capability, error) {
+	items, err := (settingsLayoutCapabilities{}).List(ctx)
+	return items[0], err
+}
+func (settingsLayoutCapabilities) Test(context.Context, string, string, string) (Capability, error) {
+	return Capability{}, ErrCapabilityUnavailable
+}
+func (settingsLayoutCapabilities) Save(context.Context, string, string, string) error {
+	return ErrCapabilityUnavailable
 }
