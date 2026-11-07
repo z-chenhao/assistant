@@ -90,7 +90,11 @@ def recover_receipt(h, path):
         delivered = [json.loads(m['text']) for m in messages if m['role'] == 'tool' and 'artifact_refs' in m['text']]
         require(delivered, 'caller did not consume recovered receipt')
         returned = delivered[-1]
-    require(returned == committed and len(committed.get('artifact_refs', [])) == 1,
+    expected_receipt = dict(committed)
+    if path == 'running':
+        require(expected_receipt.pop('object_ids', None) == 'artifacts', 'missing frozen receipt presentation')
+        expected_receipt['artifact_refs'] = [ref.removeprefix('artifact:') for ref in committed['artifact_refs']]
+    require(returned == expected_receipt and len(committed.get('artifact_refs', [])) == 1,
             'caller/committed receipt differ')
     require(json.loads(recovered['reconciliation_json']) == committed,
             'reconciliation proof lost normalized receipt')
@@ -280,7 +284,9 @@ def run(binary, scenario_jobs=1, docx_only=False):
                 h.send(kind, json.dumps({'operation': kind}))
                 h.command('chat', 'work')
                 value = h.state()
-                d = value['artifact'][-1]
+                invocation = next(t for t in value['tools'] if t['tool_name'] == 'mcp__fixture__' + kind)
+                output_ref = json.loads(invocation['result_json'])['artifact_refs'][0]
+                d = next(d for d in value['artifact'] if d['artifact_ref'] == output_ref)
                 content = h.output(d['artifact_ref'])
                 expected = (b'BINARY-FIXTURE-' * 131072) if kind == 'binary' else (b'LARGE-FIXTURE-' * 16384)
                 require(content == expected, 'large/binary Tool bytes changed')
@@ -297,10 +303,10 @@ def run(binary, scenario_jobs=1, docx_only=False):
             timed_out = h.state()
             invocation = next(t for t in timed_out['tools'] if t['tool_name'] == 'mcp__fixture__slow_binary')
             require(invocation['status'] == 'failed' and json.loads(invocation['result_json'])['error']['code'] == 'TIMEOUT', 'binary stream escaped its frozen Tool deadline')
-            require(len(timed_out['artifact']) == 2, 'timed-out bytes committed metadata')
+            require(not any(d['put_key'] == 'tool:' + invocation['invocation_id'] for d in timed_out['artifact']), 'timed-out bytes committed metadata')
             h.send('draft', json.dumps({'name': 'draft.md', 'mediaType': 'text/markdown', 'text': 'intermediate', 'draft': True}))
             h.command('chat', 'work')
-            value = h.state(); draft = value['artifact'][-1]['artifact_ref']
+            value = h.state(); draft = next(d['artifact_ref'] for d in value['artifact'] if d['name'] == 'draft.md')
             require(not any(p['artifact_ref'] == draft for p in value['artifact_publication']), 'draft auto-published')
             require(not any(p.get('artifact_ref') == draft for m in value['conversation'] for p in m['content']), 'intermediate delivered')
             return {'name': 'large_binary_refs_only_and_explicit_final_publication', 'outputs': evidence, 'timeout_state': timed_out, 'draft_state': value}
@@ -356,7 +362,9 @@ def run(binary, scenario_jobs=1, docx_only=False):
             require(all(checks.values()), 'Artifact publication assertion: ' + str(checks))
             return {'name': 'artifact-publication', 'assertions': checks,
                     'sources': sources, 'output': output, 'report': raw, 'transcript': transcript, 'state': value}
-        report['checks'].append(scenario('visa', visa))
+        # This scripted transport plan copies the complete report into a Task;
+        # exercise publication with explicit room for that duplicated input.
+        report['checks'].append(scenario('visa', visa, docx_model))
 
         def media(h):
             outputs = []

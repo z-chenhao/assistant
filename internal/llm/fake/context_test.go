@@ -1,6 +1,7 @@
 package fake
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -8,7 +9,26 @@ import (
 	artifacttools "github.com/z-chenhao/assistant/internal/artifact/tools"
 	contextbuilder "github.com/z-chenhao/assistant/internal/context"
 	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/task"
 )
+
+func TestFixturePlansExcludeRecallAndAttachmentHints(t *testing.T) {
+	const plan = `{"target":"R1","text":"current"}`
+	result := approvalReply(llm.GenerationRequest{Messages: []llm.Message{
+		{Role: "system", Text: "general Worker executing"},
+		{Role: "user", Text: "Task instruction: Effect fixture:\n" + plan + "\n\n<recall_memory>historical text</recall_memory>"},
+	}})
+	if len(result.ToolCalls) != 1 || result.ToolCalls[0].Arguments != plan {
+		t.Fatal("recalled evidence entered the effect plan", result)
+	}
+	result = artifactsReply(llm.GenerationRequest{Messages: []llm.Message{
+		{Role: "user", Text: `{"delegate":true,"name":"report.md","artifactRefs":["input"]}` + "\nUser image attachment: input\n\n<recall_memory>history</recall_memory>"},
+	}})
+	var request task.ManageRequest
+	if len(result.ToolCalls) != 1 || json.Unmarshal([]byte(result.ToolCalls[0].Arguments), &request) != nil || strings.Contains(request.Task, "attachment") || strings.Contains(request.Task, "recall_memory") || len(request.ArtifactRefs) != 1 || request.ArtifactRefs[0] != "input" {
+		t.Fatal("attachment hints or recall were copied into the Task plan", result)
+	}
+}
 
 func TestChildFixtureReadsOrdinaryArtifactIDs(t *testing.T) {
 	result, err := childrenReply(llm.GenerationRequest{Messages: []llm.Message{
@@ -59,6 +79,58 @@ func TestDelegateKeepsTaskUpdateAcrossSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 	testDelegateSummary(t, wire, "Observed Worker update:")
+}
+
+func TestApprovalFixtureKeepsTaskUpdateAcrossSummary(t *testing.T) {
+	state := agent.RuntimeContext("working_state", "artifact:history", false, map[string]string{
+		"summary": `{"fixture_context_summary":true,"task_update":true,"unknown_effect":true}`,
+	})
+	wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	messages := append([]llm.Message{{Role: "user", Text: `{"target":"R1","text":"accepted effect"}`}}, wire...)
+	result := approvalReply(llm.GenerationRequest{Messages: messages})
+	if len(result.ToolCalls) != 0 || !strings.HasPrefix(result.Text, "Observed Worker update:") {
+		t.Fatal("compaction repeated effect planning", result)
+	}
+	if !hasAppendedUser(append(messages, llm.Message{Role: "user", Text: "new steering"})) {
+		t.Fatal("summary hid fresh input")
+	}
+}
+
+func TestApprovalFixtureDistinguishesRetainedInputFromNewSteering(t *testing.T) {
+	input := llm.Message{Role: "user", Text: `{"target":"R1","text":"current"}`, Source: &llm.ContextSource{Ref: "conversation:current", Protected: true}}
+	notice := llm.Message{Role: "user", Origin: "runtime", Source: &llm.ContextSource{Kind: "task_update"}, Text: "Runtime task update: completed"}
+	args, _ := json.Marshal(task.ManageRequest{Operation: "create", Task: "Effect fixture:\n" + input.Text})
+	accepted := llm.Message{Role: "assistant", ToolCalls: []llm.ToolCall{{ID: "effect", Name: task.ManageName, Arguments: string(args)}}}
+	receipt := llm.Message{Role: "tool", ToolCallID: "effect", Text: "accepted"}
+	request, _, err := contextbuilder.SummaryRequest([]llm.Message{accepted, receipt, notice}, []llm.Message{input}, 6000, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	summary := contextReply(llm.GenerationRequest{Messages: request})
+	state := agent.RuntimeContext("working_state", "artifact:history", false, map[string]string{"summary": summary.Text})
+	wire, err := agent.ProviderMessages([]agent.AgentMessage{state}, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	messages := append(wire, input)
+	if hasAppendedUser(messages) || len(approvalReply(llm.GenerationRequest{Messages: messages}).ToolCalls) != 0 {
+		t.Fatal("retained input repeated effect planning", summary)
+	}
+	input.Source = &llm.ContextSource{Ref: "conversation:new", Protected: true}
+	if !hasAppendedUser(append(messages, input)) {
+		t.Fatal("summary suppressed new steering")
+	}
+	request, _, err = contextbuilder.SummaryRequest(wire, []llm.Message{input}, 6000, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resummary := contextReply(llm.GenerationRequest{Messages: request})
+	if !strings.Contains(resummary.Text, `"input_ref":"current"`) {
+		t.Fatal("new input claimed an earlier receipt during compaction", resummary)
+	}
 }
 
 func TestRecallFixtureKeepsTaskUpdateAcrossSummary(t *testing.T) {

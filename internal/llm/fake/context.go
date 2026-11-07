@@ -8,6 +8,8 @@ import (
 	"github.com/z-chenhao/assistant/internal/agent"
 	contextbuilder "github.com/z-chenhao/assistant/internal/context"
 	"github.com/z-chenhao/assistant/internal/llm"
+	"github.com/z-chenhao/assistant/internal/task"
+	"github.com/z-chenhao/assistant/internal/tool"
 )
 
 // Transport fixture for the tool-free summary phase. It preserves scripted
@@ -19,6 +21,7 @@ type fixtureContextSummary struct {
 	Batch         fixtureBatchSummary `json:"batch"`
 	TaskUpdate    bool                `json:"task_update,omitempty"`
 	UnknownEffect bool                `json:"unknown_effect,omitempty"`
+	InputRef      string              `json:"input_ref,omitempty"`
 }
 
 type fixtureBatchSummary struct {
@@ -42,10 +45,37 @@ func contextReply(request llm.GenerationRequest) llm.GenerationResult {
 	seen := map[string]bool{}
 	for _, m := range sources {
 		old := contextSummary(m)
+		if old.InputRef != "" {
+			summary.InputRef = old.InputRef
+		}
 		summary.TaskUpdate = summary.TaskUpdate || old.TaskUpdate || m.Origin == "runtime" && m.Source != nil && m.Source.Kind == "task_update"
 		summary.UnknownEffect = summary.UnknownEffect || old.UnknownEffect || strings.Contains(m.Text, "UNKNOWN_SIDE_EFFECT")
 		if old.Fixture && old.Batch.Next > summary.Batch.Next {
 			summary.Batch = old.Batch
+		}
+	}
+	if _, raw, ok := strings.Cut(text, "Protected task inputs and Host facts (also retained verbatim in the live context):\n"); ok {
+		var anchors []llm.Message
+		if json.NewDecoder(strings.NewReader(raw)).Decode(&anchors) == nil {
+			for _, m := range anchors {
+				if m.Role == "user" && m.Origin == "" && m.Source != nil {
+					for _, source := range sources {
+						for _, call := range source.ToolCalls {
+							var control task.ManageRequest
+							if call.ID != "effect" || call.Name != task.ManageName || json.Unmarshal([]byte(call.Arguments), &control) != nil {
+								continue
+							}
+							plan := control.Task
+							if control.Operation == "append" {
+								plan = control.Instruction
+							}
+							if strings.HasPrefix(plan, "Effect fixture:\n") && fixturePlan(strings.TrimPrefix(plan, "Effect fixture:\n")) == fixturePlan(strings.TrimPrefix(m.Text, "Delegate effect: ")) {
+								summary.InputRef = tool.ObjectID(m.Source.Ref)
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 	previous := summary.Batch.Next
@@ -76,6 +106,15 @@ func contextReply(request llm.GenerationRequest) llm.GenerationResult {
 	}
 	raw, _ := json.Marshal(summary)
 	return llm.GenerationResult{Text: string(raw)}
+}
+
+func fixturePlan(text string) string {
+	var value any
+	if json.NewDecoder(strings.NewReader(text)).Decode(&value) != nil {
+		return ""
+	}
+	raw, _ := json.Marshal(value)
+	return string(raw)
 }
 
 func contextReceipts(m llm.Message) []string {

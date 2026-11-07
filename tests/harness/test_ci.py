@@ -81,6 +81,10 @@ class CIChecksTests(unittest.TestCase):
         for regression in ('Recall', 'Forget', 'Evidence', 'ObjectIDs'):
             self.assertIn(regression, commands)
 
+    def test_artifact_round_trips_run_in_required_tools_lane(self):
+        self.assertIn('artifacts', CORE)
+        self.assertEqual(ci.command('tools-provider').count('--gate artifacts'), 1)
+
     def test_required_check_rejects_missing_failed_and_cancelled_work(self):
         for docs in ('true', 'false'):
             selected = 'skipped' if docs == 'true' else 'success'
