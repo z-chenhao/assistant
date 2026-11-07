@@ -294,10 +294,10 @@ export async function capabilityDefaults(page,context,url,evidence){
  await page.goto(url+'/settings/capabilities');
  if(await page.locator('.object-row').count()!==5)throw Error('duplicate Memory search entry');
  const memory=page.locator('.object-row[href="/settings/capabilities/memory"]');
- await memory.getByText('已启用（默认）',{exact:true}).waitFor();
+ await memory.getByText('已启用',{exact:true}).waitFor();
  await page.screenshot({path:evidence+'/capabilities-default.png',fullPage:true});
  await memory.click();
- await page.getByText('已启用（默认）',{exact:true}).waitFor();
+ await page.getByText('已启用',{exact:true}).waitFor();
  if(!await page.locator('section.settings-group').isVisible()||await page.locator('[data-capability-fields]').isVisible())throw Error('default mode exposed custom configuration');
  await Promise.all([page.waitForResponse(r=>new URL(r.url()).pathname==='/capability/configure'&&r.request().method()==='POST'),selectValue(page,page.locator('#capability-mode'),'custom')]);
  await page.locator('[data-capability-draft]').filter({hasText:'已保存。'}).waitFor();

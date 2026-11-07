@@ -995,7 +995,7 @@ def default_capability_settings(binary,evidence,report):
             require(len(base64.b64decode(server.values[key_ref]))==32,'default Memory did not create its key')
             h.stop();h.start()
             require(json.loads((root/'data/default-memory.json').read_text())['ref']==key_ref,'restart replaced the default key')
-            require('Enabled (default)' in h.http('/settings/capabilities/memory'),'default Memory lost its enabled status')
+            require('Enabled' in h.http('/settings/capabilities/memory'),'default Memory lost its enabled status')
             require(not (root/'data.desktop').exists(),'browsing settings prepared a desktop')
             report['checks'].append('Default Memory and local search start together; one enabled Memory entry, concise Preferences layout, Chinese/mobile, stable SecretStore key and no desktop download')
             h.stop()

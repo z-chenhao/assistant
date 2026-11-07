@@ -12,7 +12,7 @@ Memory 使用跨进程锁分配随机 SecretStore 引用，确认 32 字节密�
 
 本地搜索直接查询已有 SQLite 文本索引，支持中文子串；不调用 embedding 服务、不制造向量、不绑定向量空间。加密 Memory 的明文索引仍只在内存中。可在设置中接入自定义 embedding，既有向量身份变更仍要求离线迁移。Conversation-only 与包含 Memory 的默认搜索具有不同冻结资源身份。
 
-普通表单通过 `mode: automatic` 表达自动候选，Manager 将其转换为 `defaults` 对应开关并删除自定义 section；自动 Computer 同时移除本地执行覆盖。关闭同时清除自动开关，重启不会重新开启。Memory 关闭还原子清除 embedding section 并关闭 defaults.search；重新开启 Memory 默认恢复本地检索。自定义密钥仍必须与既有默认密钥一致。
+普通表单以 Auto／自动显示自动选项，当前模式由选中态表达，不附加默认或推荐标记；底层仍通过 `mode: automatic` 表达自动候选，Manager 将其转换为 `defaults` 对应开关并删除自定义 section；自动 Computer 同时移除本地执行覆盖。关闭同时清除自动开关，重启不会重新开启。Memory 关闭还原子清除 embedding section 并关闭 defaults.search；重新开启 Memory 默认恢复本地检索。自定义密钥仍必须与既有默认密钥一致。
 
 Computer 的详细下载、Guest 准备与等待协议见 [Computer 方案](computer-use.md#自动桌面准备)。自动资源的连接测试只确认选择默认模式，实际进度独立显示；不把配置选择当作桌面已启动。
 

@@ -210,10 +210,10 @@ Live 缺口明确保留：创建项目后，用受控测试账户完成至少邮
 
 Apps 图标与目录：`TestAppLogosBundledForEverySuggestedApp` 检查每个推荐应用的同源 SVG 响应、可解析形状与缓存头；`TestAppLogoNewProviderMetadataUsesAnonymousBoundedCache` 验证新应用采用官方元数据、匿名读取与缓存，拒绝任意主机、带凭据／端口／查询参数的来源和未登记名称。`TestAppLogoSanitizationRetainsBrandShapesAndRejectsActiveContent` 覆盖脚本、事件、嵌入页面、外链、多根／损坏 XML、过大响应和重定向，同时保留品牌渐变。客户端目录测试校验 `meta.logo` 投影。
 
-`TestAppsBrowserConnectionLifecycle` 另外验证 65 个推荐应用全部加载真实图片、中英文分组目录在 1400px 为双列、390／320px 为单列且无横向溢出，以及深色显示；账户详情弹窗可用 Escape 关闭，连接后侧栏显示品牌图标，断开后移除侧栏项。宽目录标题按自身内容边界对齐，保留 Settings 标题的纵向位置和字号。截图只含合成账户，浏览器门禁不访问外部账户或图标 CDN。
+`TestAppsBrowserConnectionLifecycle` 另外验证完整目录中 65 个编辑应用全部加载真实图片、中英文发现页在 1400px 为双列、390／320px 为单列且无横向溢出，以及深色显示；账户详情弹窗可用 Escape 关闭，连接后侧栏显示品牌图标，断开后移除侧栏项。宽目录标题按自身内容边界对齐，保留 Settings 标题的纵向位置和字号。截图只含合成账户，浏览器门禁不访问外部账户或图标 CDN。
 
 
-目录呈现验收：发现页按用途分类，移除“热门”后原有推荐应用仍全部可见，并回归所属分类；Settings 的 Apps 四宫格图标与 Resources 服务器图标可直接区分。保留中英文、移动端、搜索、应用详情及连接流程检查。
+目录呈现验收：`TestAppsDiscoveryPreviewsAndCollectionsKeepEveryAppReachable` 验证六个精选顺序、每组最多六项、首页无重复、完整分组名称排序、所有编辑应用仍可达、保存的连接状态与未知分组拒绝；`TestAppsBrowserConnectionLifecycle` 验证精选／分组／全部应用导航、原生无脚本分组与实时目录入口，保留完整目录分类筛选、图片及分页覆盖；Settings 的 Apps 四宫格图标与 Resources 服务器图标可直接区分。保留中英文、移动端、搜索、应用详情及连接流程检查。
 
 
 合入统一组件规范后的 Apps 浏览器场景复用真实 Base UI 分类选择器，验证取消筛选不提交；断开确认默认聚焦取消、Escape 保留账户、确认后仅断开目标。截图覆盖明暗主题的桌面／手机目录及账户详情，并检查 200% 缩放下弹窗及其内容留在可操作范围内。数据库迁移在已有 044／045 后追加 046，回滚夹具移除新表后按原有迁移路径重开。

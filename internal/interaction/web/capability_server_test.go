@@ -29,7 +29,7 @@ func TestDefaultMemoryHasOneEnabledEntryAndPreferenceLayout(t *testing.T) {
 	s.Capabilities = m
 	response := capabilityRequest(s, "GET", "/settings/capabilities", nil)
 	body := response.Body.String()
-	if response.Code != 200 || strings.Count(body, `class="object-row"`) != 5 || !strings.Contains(body, "Enabled (default)") || strings.Contains(body, `href="/settings/capabilities/embedding"`) || strings.Contains(body, "Not verified") {
+	if response.Code != 200 || strings.Count(body, `class="object-row"`) != 5 || !strings.Contains(body, "Enabled") || strings.Contains(body, `href="/settings/capabilities/embedding"`) || strings.Contains(body, "Not verified") {
 		t.Fatal(response.Code, body)
 	}
 	response = capabilityRequest(s, "GET", "/settings/capabilities/memory", nil)

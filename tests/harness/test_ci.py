@@ -1,5 +1,8 @@
 """Check partition completeness and the fail-closed required status."""
 import unittest
+import re
+import shlex
+import subprocess
 from pathlib import Path
 from unittest.mock import DEFAULT, patch
 
@@ -35,6 +38,17 @@ class CIChecksTests(unittest.TestCase):
         self.assertIn('make test-browser', ci.command('browser-infra'))
         self.assertEqual(lanes['browser-infra']['browser'], 'true')
         self.assertEqual(lanes['browser-infra']['frontend'], 'true')
+        dry_run = subprocess.check_output(['make', '-n', 'test-browser'],
+                                          cwd=Path(__file__).resolve().parents[2], text=True)
+        patterns = []
+        for line in dry_run.splitlines():
+            tokens = shlex.split(line)
+            if '-run' in tokens:
+                patterns.append(tokens[tokens.index('-run') + 1])
+        for test in ('TestAppsBrowserConnectionLifecycle', 'TestComposerModelsBrowserLoadingAndRefresh'):
+            self.assertTrue(any(re.fullmatch(pattern, test) for pattern in patterns),
+                            f'{test} is missing from the required browser recipe')
+
 
     def test_all_core_gates_run_once(self):
         gates = [gate for group in ci.SYSTEM.values() for gate in group]

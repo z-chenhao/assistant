@@ -18,7 +18,7 @@ func TestCapabilityStatusDistinguishesConfigurationFromConnectionProof(t *testin
 		chinese    string
 	}{
 		{"off", Capability{}, "Off", "关闭"},
-		{"automatic", Capability{Configured: true, Automatic: true}, "Enabled (default)", "已启用（默认）"},
+		{"automatic", Capability{Configured: true, Automatic: true}, "Enabled", "已启用"},
 		{"custom", Capability{Configured: true}, "Enabled", "已启用"},
 		{"preparing", Capability{Configured: true, Automatic: true, State: "preparing"}, "Preparing", "准备中"},
 		{"unsupported", Capability{Configured: true, Automatic: true, State: "unsupported"}, "Unavailable on this device", "此设备暂不支持"},

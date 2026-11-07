@@ -68,3 +68,101 @@ export async function modelConnections(page,context,url,evidence){
  await page.setViewportSize({width:1400,height:980});await page.goto(url+'/settings/models');
  await writeFile(evidence+'/models-connections.json',JSON.stringify({keyed,first,backup,defaultPreserved:true,composerSelection:true,credentialNotEchoed:true,nativeFallback:true},null,2));
 }
+
+
+// Controlled HTTP responses exercise the real picker and shared Select/Combobox.
+// Actual account admission and version fences remain covered by the account flow.
+export async function composerModelLoading(page,context,url,evidence){
+ const key=name=>'account:owned:'+name;
+ const choices=['gpt-6-luna','gpt-5.6-luna',...Array.from({length:13},(_,i)=>'fixture-model-'+String(i+1).padStart(2,'0'))].map(label=>({key:key(label),label}));
+ choices.push({key:key('retired'),label:'Unavailable model',disabled:true},{key:'profile:api-connection:1',label:'API connection'});
+ choices.sort((a,b)=>a.label.toLowerCase()>b.label.toLowerCase()?-1:1);
+ let current=key('gpt-6-luna'),version=1,reads=0,mode='initial',release,started,dropSwitch=false;
+ const blocked=new Promise(resolve=>{release=resolve});const firstRead=new Promise(resolve=>{started=resolve});
+ let held=blocked,begin=started;
+ const json=body=>({status:200,contentType:'application/json',body:JSON.stringify(body)});
+ await page.route('**/api/models',async route=>{
+  reads++;const snapshot={choices,current,config_version:version};
+  if(mode==='initial'||mode==='delayed'){begin();await held}
+  if(mode==='failed'){await route.fulfill({status:503});return}
+  if(mode==='partial'){await route.fulfill(json({...snapshot,choices:[...choices.filter(choice=>choice.key===current||choice.label.startsWith('gpt-')||choice.key.startsWith('profile:')),{...choices.find(choice=>choice.label==='fixture-model-09'),disabled:true}],unavailable:true}));return}
+  await route.fulfill(json(snapshot)).catch(()=>{});
+ });
+ await page.route('**/model/choose',async route=>{
+  const form=new URLSearchParams(route.request().postData());
+  if(Number(form.get('config_version'))!==version)throw Error('stale catalog overwrote confirmed selection version');
+  current=form.get('choice');version++;
+  if(current.startsWith('profile:')){
+   const choice=choices.find(choice=>choice.key===current);
+   current='profile:api-connection:'+version;choice.key=current;
+  }
+  if(dropSwitch){dropSwitch=false;await route.abort();return}
+  // The production acknowledgement deliberately includes only saved profiles.
+  await route.fulfill(json({current,config_version:version,choices:choices.filter(choice=>choice.key===current||choice.key.startsWith('profile:'))}));
+ });
+ await page.reload();await firstRead;
+ const picker=page.locator('#composer-model-picker');await picker.waitFor();
+ const draft=page.getByLabel('Message Ghost',{exact:true});await draft.fill('Keep this delayed model-switch draft.');
+ await page.getByLabel('Attach a file').setInputFiles({name:'picker-draft.txt',mimeType:'text/plain',buffer:Buffer.from('keep attachment')});
+ await picker.click();await page.getByRole('status').filter({hasText:'Loading models…'}).waitFor();
+ if(await page.getByRole('option').count()||reads!==1)throw Error('first open exposed partial models or duplicated the prefetch');
+ await page.screenshot({path:evidence+'/model-picker-loading.png'});
+ await page.keyboard.press('Escape');await picker.and(page.locator(':focus')).waitFor();await picker.click();
+ if(reads!==1)throw Error('reopening duplicated an in-flight catalogue read');
+ mode='ready';release();
+ await page.getByRole('option',{name:'fixture-model-13',exact:true}).waitFor();
+ if(await page.getByRole('option').count()!==choices.length)throw Error('full catalogue did not replace loading state');
+ await page.getByRole('option',{name:'fixture-model-13',exact:true}).click();await picker.filter({hasText:'fixture-model-13'}).waitFor();
+ const assertDraft=async()=>{if(await draft.inputValue()!=='Keep this delayed model-switch draft.'||await page.getByLabel('Attach a file').evaluate(node=>node.files?.[0]?.name)!=='picker-draft.txt')throw Error('model switch discarded draft or attachment')};
+ await assertDraft();
+ mode='delayed';let reading;const nextRead=new Promise(resolve=>{reading=resolve});begin=reading;held=new Promise(resolve=>{release=resolve});
+ await picker.click();await nextRead;
+ const available=page.getByRole('option',{name:'fixture-model-12',exact:true});
+ if(await page.getByRole('option').count()!==choices.length||await available.getAttribute('aria-disabled')==='true')throw Error('background refresh shrank or disabled the complete catalogue');
+ if(await page.getByRole('option',{name:'Unavailable model',exact:true}).getAttribute('aria-disabled')!=='true')throw Error('real unavailable model became selectable');
+ await available.click();await picker.filter({hasText:'fixture-model-12'}).waitFor();mode='ready';release();
+ await assertDraft();
+ mode='partial';await picker.click();await page.getByText('Some account models are unavailable. Try again.',{exact:true}).waitFor();
+ if(await page.getByRole('option').count()!==choices.length)throw Error('partial catalogue response discarded the complete list');
+ if(await page.getByRole('option',{name:'fixture-model-09',exact:true}).getAttribute('aria-disabled')!=='true')throw Error('partial catalogue ignored an authoritative disabled flag');
+ await page.keyboard.press('Escape');
+ mode='failed';await picker.click();await page.getByText('The account model list is unavailable.',{exact:true}).waitFor();
+ if(await page.getByRole('option').count()!==choices.length)throw Error('failed refresh lost cached choices');
+ await page.getByRole('option',{name:'fixture-model-11',exact:true}).click();await picker.filter({hasText:'fixture-model-11'}).waitFor();
+ mode='ready';dropSwitch=true;await picker.click();await page.getByRole('option',{name:'fixture-model-10',exact:true}).click();await picker.filter({hasText:'fixture-model-10'}).waitFor();await assertDraft();
+ if(await page.getByText('Model selection failed. Try again.',{exact:true}).count())throw Error('unknown applied selection failed readback');
+ dropSwitch=true;await picker.click();await page.getByRole('option',{name:'API connection',exact:true}).click();await picker.filter({hasText:'API connection'}).waitFor();
+ if(await page.getByText('Model selection failed. Try again.',{exact:true}).count())throw Error('canonical profile selection failed readback after a lost response');
+ const changedProfile=choices.find(choice=>choice.key.startsWith('profile:'));changedProfile.key='profile:api-connection:'+ ++version;current=changedProfile.key;
+ mode='partial';await picker.click();await page.getByText('Some account models are unavailable. Try again.',{exact:true}).waitFor();await page.getByRole('option',{name:'API connection',exact:true}).waitFor();
+ if(await page.getByRole('option').count()!==choices.length)throw Error('new profile version duplicated or removed cached choices');
+ mode='ready';await page.getByRole('option',{name:'fixture-model-10',exact:true}).click();await picker.filter({hasText:'fixture-model-10'}).waitFor();await assertDraft();
+ for(const language of ['en','zh-CN']){
+  await context.request.post(url+'/settings/language',{form:{language}});
+  for(const theme of ['light','dark'])for(const width of [1400,320]){
+   await page.setViewportSize({width,height:980});await page.reload();await picker.waitFor();
+   await page.evaluate(theme=>{localStorage.setItem('steward-theme',theme);document.documentElement.classList.toggle('dark',theme==='dark')},theme);
+   await picker.click();await page.getByRole('option',{name:'fixture-model-13',exact:true}).waitFor();
+   await page.evaluate(()=>document.fonts.ready);
+   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('model picker overflowed');
+   await page.screenshot({path:`${evidence}/model-picker-${language}-${theme}-${width}.png`});await page.keyboard.press('Escape');
+  }
+ }
+ await context.request.post(url+'/settings/language',{form:{language:'en'}});
+ mode='failed';await page.reload();await page.getByText('The account model list is unavailable.',{exact:true}).waitFor();
+ await picker.click();const fallback=page.getByRole('option',{name:'gpt-6-luna',exact:true});await fallback.waitFor();
+ if(await fallback.getAttribute('aria-disabled')==='true')throw Error('initial read failure disabled saved fallback');
+ await page.keyboard.press('Escape');mode='ready';await picker.click();await page.getByRole('option',{name:'fixture-model-13',exact:true}).waitFor();await page.keyboard.press('Escape');
+ for(const mode of ['no-script','fetch-unavailable']){
+  const plain=await context.browser().newContext({javaScriptEnabled:mode!=='no-script'});
+  try{
+   await plain.addCookies(await context.cookies());
+   if(mode==='fetch-unavailable')await plain.addInitScript(()=>{window.fetch=undefined});
+   const fallback=await plain.newPage();await fallback.goto(url);
+   await fallback.locator('#composer-model').waitFor();await fallback.locator('.model-native-submit').waitFor();
+   await fallback.locator('#composer-model').selectOption(key('gpt-6-luna'));
+   if(await fallback.locator('#composer-model').inputValue()!==key('gpt-6-luna'))throw Error(mode+' lost native model selection');
+  }finally{await plain.close()}
+ }
+ await writeFile(evidence+'/composer-model-loading.json',JSON.stringify({prefetch:true,singleFlight:true,noPartialMenu:true,completeAfterSwitch:true,canonicalProfileVersion:true,usableDuringRefresh:true,failedRefreshRetainsChoices:true,initialFailureRetry:true,partialCatalogueRetainsChoices:true,nativeFallback:true,lateReadFenced:true,unknownSelectionReadback:true,draftAndAttachment:true,models:choices.length},null,2));
+}
