@@ -279,3 +279,5 @@ Models 为 Settings 的独立分类，包含「Sign in with an account」和「C
 
 
 Trace 阅读与筛选回归：`traces_test.go` 的分页请求读取测试验证完整 JSON 组装及安全原始回退；`agent/sqlite/traces_test.go` 使用真实数据库验证 TTFT 含重试、缺失证据与 HTTP 阶段区别。`web/trace-request.test.mjs` 验证转义、多行、重复键与精度回退；日期 UT 验证当地跨天、星期和旧日期 yyyy-MM-dd。native-trace 浏览器场景在同一抽屉中切换 Context 消息与 JSON 格式、核对结构化 Requests 与原始 JSON；Memory 与 Traces 场景直接选择筛选并核对 URL／结果，无需 Apply filters。共享列表及设置导航场景核对一级／二级宽度一致，保留明暗、宽窄屏截图及无脚本路线。
+
+HTTP 浏览器兼容：`web/random-id.test.mjs` 覆盖原生 UUID、仅有 `getRandomValues` 时的 UUIDv4 格式／版本／variant 及加密随机源失败；沿用 required frontend `npm test`。HTTP 局域网部署验证实际非安全来源下的聊天发送标识轮换、模型选择、五个 Settings 页面及同源表单；不向真实模型发送测试消息。

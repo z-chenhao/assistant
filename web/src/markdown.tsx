@@ -1,3 +1,4 @@
+import {randomUUID} from './lib/random-id';
 import {useEffect,useMemo,useRef} from 'react';
 import {Marked,Renderer} from 'marked';
 import DOMPurify from 'dompurify';
@@ -37,7 +38,7 @@ export function enhanceDiagrams(scope:ParentNode){
   void(async()=>{
    try{
     await loadDiagrams();if(!code.isConnected)return;
-    const svg=await window.stewardDiagram!(source,'diagram-'+crypto.randomUUID());
+    const svg=await window.stewardDiagram!(source,'diagram-'+randomUUID());
     if(!code.isConnected)return;
     const img=document.createElement('img');img.className='markdown-diagram';img.alt=t('Diagram');
     const href=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'}));

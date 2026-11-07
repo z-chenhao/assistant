@@ -1,3 +1,4 @@
+import {randomUUID} from './lib/random-id';
 import {flushUIStates} from './intelligent-ui/state';
 import {showOutgoing,outgoingState,reconcileOutgoing,discardOutgoing} from './outgoing';
 import {t} from './i18n';
@@ -36,7 +37,7 @@ export function enhanceComposer(messageAccepted?: (target:URL)=>void){
   document.querySelector('.welcome')?.remove();
   const entry=showOutgoing(submittedSource,submittedText,submittedFile);
   // Snapshot before clearing; uncertain retries reuse this exact source and file.
-  source.value=root.dataset.sourceId=crypto.randomUUID().replaceAll('-','');
+  source.value=root.dataset.sourceId=randomUUID().replaceAll('-','');
   text.value='';if(file)file.value='';showFile();if(feedback)feedback.textContent='';
   text.focus({preventScroll:true});requestAnimationFrame(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
   const send=async()=>{

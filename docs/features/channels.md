@@ -355,3 +355,5 @@ Settings 单值配置按左侧标签／右侧控件同行排列，同级命令�
 通知目的地选择后自动保存，携带版本并更新确认版本；冲突／写入结果未知不自动重发，刷新读取实际状态。无脚本保留原生提交。Settings 五个分类及详情共用内容宽度、标题起点与留白，配置行的单值选择器跨页等宽，Models 按 Models 归组两类模型连接，App service 使用键值行和右对齐同宽操作；Apps 目录在公共容器内保留双列／单列布局。相关回归由 settings_test、channels_preferences、page-transitions 和 apps_connections_browser 覆盖。
 
 Models 为 Settings 的独立分类，包含「Sign in with an account」和「Connect with an API key」。账户目录自动进入聊天模型选择器；API 连接使用现有私有文件 SecretStore，凭据与首个模型元数据一次事务保存，失败清理新文件。连接后自动验证；首次无当前模型自动选用，后续连接不覆盖选择。连接操作复用共享菜单和原生表单，断开采用模型及凭据双版本确认并撤销后续使用，保留历史冻结配置。Apps 工具栏 App settings 进入服务配置；原 Models/Resources 服务入口移除，旧 setup 与 services/apps 深链接保留重定向。浏览器回归覆盖实际 HTTP provider 的 API key、聊天模型切换、断开及明暗／窄屏布局。
+
+浏览器请求标识在 HTTPS 使用原生 UUID，在 HTTP 来源使用 Web Crypto 加密随机源生成同格式的 UUIDv4；聊天发送、Intelligent UI 交互／导出和图表渲染不依赖 HTTPS 专属的 `randomUUID` 接口。重试继续复用原请求标识，不改动 Host 授权或监听策略。
