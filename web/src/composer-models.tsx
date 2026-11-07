@@ -7,6 +7,13 @@ import {t} from './i18n';
 
 const models=z.object({choices:z.array(z.object({key:z.string(),label:z.string(),disabled:z.boolean().optional()})),current:z.string(),config_version:z.number().int(),unavailable:z.boolean().optional()});
 type Models=z.infer<typeof models>;
+// Reads and acknowledgements contain authoritative saved profiles, whose keys
+// can change on activation. Retain only the extra account catalogue entries.
+function retainAccountChoices(previous:Models,received:Models):Models{
+ const choices=new Map(previous.choices.filter(choice=>choice.key.startsWith('account:')).map(choice=>[choice.key,choice]));
+ for(const choice of received.choices)choices.set(choice.key,choice);
+ return {...received,choices:[...choices.values()].sort((a,b)=>{const x=a.label.toLowerCase(),y=b.label.toLowerCase();return x===y?0:x>y?-1:1})};
+}
 function ModelPicker({initial,composer}:{initial:Models;composer:HTMLFormElement}){
  const[data,setData]=useState(initial),[open,setOpen]=useState(false),[loading,setLoading]=useState(false),[ready,setReady]=useState(false),[saving,setSaving]=useState(false),[sending,setSending]=useState(!!composer.dataset.submitting),[error,setError]=useState('');
  useEffect(()=>{const observer=new MutationObserver(()=>setSending(!!composer.dataset.submitting));observer.observe(composer,{attributes:true,attributeFilter:['data-submitting']});return()=>observer.disconnect()},[composer]);
@@ -24,11 +31,7 @@ function ModelPicker({initial,composer}:{initial:Models;composer:HTMLFormElement
     setData(previous=>{
      if(value.config_version<previous.config_version)return previous;
      if(!value.unavailable)return value;
-     // An incomplete account catalogue must not discard the last usable list.
-     // Returned entries still update genuine disabled flags and the current key.
-     const choices=new Map(previous.choices.map(choice=>[choice.key,choice]));
-     for(const choice of value.choices)choices.set(choice.key,choice);
-     return {...value,choices:[...choices.values()].sort((a,b)=>{const x=a.label.toLowerCase(),y=b.label.toLowerCase();return x===y?0:x>y?-1:1})};
+     return retainAccountChoices(previous,value);
     });
     if(value.unavailable)setError('Some account models are unavailable. Try again.');return value;
    }catch{if(!controller.signal.aborted)setError('The account model list is unavailable.')}
@@ -42,7 +45,7 @@ function ModelPicker({initial,composer}:{initial:Models;composer:HTMLFormElement
   reading.current?.controller.abort();reading.current=null;setLoading(false);
   setOpen(false);setSaving(true);setError('');composer.dataset.modelSelecting='true';
   const submit=composer.querySelector<HTMLButtonElement>('button[type=submit]');if(submit)submit.disabled=true;
-  try{const response=await fetch('/model/choose',{method:'POST',headers:{Accept:'application/json'},signal:AbortSignal.timeout(30000),body:new URLSearchParams({consent:'yes',choice:value,config_version:String(data.config_version)})});if(!response.ok)throw Error();const confirmed=models.parse(await response.json());setData(previous=>({...previous,current:confirmed.current,config_version:confirmed.config_version}))}
+  try{const response=await fetch('/model/choose',{method:'POST',headers:{Accept:'application/json'},signal:AbortSignal.timeout(30000),body:new URLSearchParams({consent:'yes',choice:value,config_version:String(data.config_version)})});if(!response.ok)throw Error();const confirmed=models.parse(await response.json());setData(previous=>retainAccountChoices(previous,confirmed))}
   catch{const latest=await refresh();if(latest?.current!==value)setError('Model selection failed. Try again.')}
   finally{delete composer.dataset.modelSelecting;setSaving(false);if(submit)submit.disabled=!!composer.dataset.submitting||document.querySelector<HTMLElement>('[data-can-send]')?.dataset.canSend==='false'}
  }

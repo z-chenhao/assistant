@@ -75,7 +75,7 @@ export async function modelConnections(page,context,url,evidence){
 export async function composerModelLoading(page,context,url,evidence){
  const key=name=>'account:owned:'+name;
  const choices=['gpt-6-luna','gpt-5.6-luna',...Array.from({length:13},(_,i)=>'fixture-model-'+String(i+1).padStart(2,'0'))].map(label=>({key:key(label),label}));
- choices.push({key:key('retired'),label:'Unavailable model',disabled:true});
+ choices.push({key:key('retired'),label:'Unavailable model',disabled:true},{key:'profile:api-connection:1',label:'API connection'});
  choices.sort((a,b)=>a.label.toLowerCase()>b.label.toLowerCase()?-1:1);
  let current=key('gpt-6-luna'),version=1,reads=0,mode='initial',release,started,dropSwitch=false;
  const blocked=new Promise(resolve=>{release=resolve});const firstRead=new Promise(resolve=>{started=resolve});
@@ -85,16 +85,20 @@ export async function composerModelLoading(page,context,url,evidence){
   reads++;const snapshot={choices,current,config_version:version};
   if(mode==='initial'||mode==='delayed'){begin();await held}
   if(mode==='failed'){await route.fulfill({status:503});return}
-  if(mode==='partial'){await route.fulfill(json({...snapshot,choices:[...choices.filter(choice=>choice.key===current||choice.label.startsWith('gpt-')),{...choices.find(choice=>choice.label==='fixture-model-09'),disabled:true}],unavailable:true}));return}
+  if(mode==='partial'){await route.fulfill(json({...snapshot,choices:[...choices.filter(choice=>choice.key===current||choice.label.startsWith('gpt-')||choice.key.startsWith('profile:')),{...choices.find(choice=>choice.label==='fixture-model-09'),disabled:true}],unavailable:true}));return}
   await route.fulfill(json(snapshot)).catch(()=>{});
  });
  await page.route('**/model/choose',async route=>{
   const form=new URLSearchParams(route.request().postData());
   if(Number(form.get('config_version'))!==version)throw Error('stale catalog overwrote confirmed selection version');
   current=form.get('choice');version++;
+  if(current.startsWith('profile:')){
+   const choice=choices.find(choice=>choice.key===current);
+   current='profile:api-connection:'+version;choice.key=current;
+  }
   if(dropSwitch){dropSwitch=false;await route.abort();return}
   // The production acknowledgement deliberately includes only saved profiles.
-  await route.fulfill(json({current,config_version:version,choices:choices.filter(choice=>choice.key===current)}));
+  await route.fulfill(json({current,config_version:version,choices:choices.filter(choice=>choice.key===current||choice.key.startsWith('profile:'))}));
  });
  await page.reload();await firstRead;
  const picker=page.locator('#composer-model-picker');await picker.waitFor();
@@ -127,6 +131,11 @@ export async function composerModelLoading(page,context,url,evidence){
  await page.getByRole('option',{name:'fixture-model-11',exact:true}).click();await picker.filter({hasText:'fixture-model-11'}).waitFor();
  mode='ready';dropSwitch=true;await picker.click();await page.getByRole('option',{name:'fixture-model-10',exact:true}).click();await picker.filter({hasText:'fixture-model-10'}).waitFor();await assertDraft();
  if(await page.getByText('Model selection failed. Try again.',{exact:true}).count())throw Error('unknown applied selection failed readback');
+ await picker.click();await page.getByRole('option',{name:'API connection',exact:true}).click();await picker.filter({hasText:'API connection'}).waitFor();
+ const changedProfile=choices.find(choice=>choice.key.startsWith('profile:'));changedProfile.key='profile:api-connection:'+ ++version;current=changedProfile.key;
+ mode='partial';await picker.click();await page.getByText('Some account models are unavailable. Try again.',{exact:true}).waitFor();await page.getByRole('option',{name:'API connection',exact:true}).waitFor();
+ if(await page.getByRole('option').count()!==choices.length)throw Error('new profile version duplicated or removed cached choices');
+ mode='ready';await page.getByRole('option',{name:'fixture-model-10',exact:true}).click();await picker.filter({hasText:'fixture-model-10'}).waitFor();await assertDraft();
  for(const language of ['en','zh-CN']){
   await context.request.post(url+'/settings/language',{form:{language}});
   for(const theme of ['light','dark'])for(const width of [1400,320]){
@@ -154,5 +163,5 @@ export async function composerModelLoading(page,context,url,evidence){
    if(await fallback.locator('#composer-model').inputValue()!==key('gpt-6-luna'))throw Error(mode+' lost native model selection');
   }finally{await plain.close()}
  }
- await writeFile(evidence+'/composer-model-loading.json',JSON.stringify({prefetch:true,singleFlight:true,noPartialMenu:true,completeAfterSwitch:true,usableDuringRefresh:true,failedRefreshRetainsChoices:true,initialFailureRetry:true,partialCatalogueRetainsChoices:true,nativeFallback:true,lateReadFenced:true,unknownSelectionReadback:true,draftAndAttachment:true,models:choices.length},null,2));
+ await writeFile(evidence+'/composer-model-loading.json',JSON.stringify({prefetch:true,singleFlight:true,noPartialMenu:true,completeAfterSwitch:true,canonicalProfileVersion:true,usableDuringRefresh:true,failedRefreshRetainsChoices:true,initialFailureRetry:true,partialCatalogueRetainsChoices:true,nativeFallback:true,lateReadFenced:true,unknownSelectionReadback:true,draftAndAttachment:true,models:choices.length},null,2));
 }
